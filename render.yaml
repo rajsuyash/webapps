@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: todo-app
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: todo-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+  
+  - type: pserv
+    name: todo-db
+    plan: free
+    databaseName: todo_db
+    databaseUser: todo_user
