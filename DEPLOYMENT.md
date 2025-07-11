@@ -37,7 +37,7 @@ This guide will help you deploy your AI-powered Todo app to Render.
    - **Environment**: `Node`
    - **Region**: Choose closest to your users
    - **Branch**: `main`
-   - **Build Command**: `npm ci && npm run build`
+   - **Build Command**: `npm install && npm run build`
    - **Start Command**: `npm start`
 
 5. Add Environment Variables:
