@@ -16,9 +16,12 @@ preserving every formula, number format, column width, merged cell and the templ
 
 | | |
 |---|---|
-| **Input – Source** | Per‑seller calculation sheet (`.csv` or `.xlsx`). Contains the seller header block + a table of original invoices to be credited. |
-| **Input – Target** | The master SDI template (`.xlsx`) — a consolidation register that already holds many sellers' rows. |
-| **Output** | The same template with this seller's rows added, downloadable as a fully Excel‑compatible `.xlsx`. |
+| **Input – Source** (required) | Per‑seller calculation sheet (`.csv` or `.xlsx`). Contains the seller header block + a table of original invoices to be credited. |
+| **Target template** (built‑in) | The SDI template is **embedded in the app** — by default you upload **only the seller file**. A clean, fully‑formatted SDI sheet (headers, styles, column widths and the FX‑rate link, no third‑party data) is used as the starting point. |
+| **Target template** (optional upload) | Switch to **“Upload my own”** to consolidate this seller into an existing **master** SDI register (a file that already holds other sellers' rows). |
+| **Output** | A fully Excel‑compatible `.xlsx` containing this seller's Credit/Rebill rows — either as a fresh sheet (built‑in) or appended to your master (upload). |
+
+> **Why optional?** For a single seller you don't need to supply anything but the calculation file — the tool already knows the exact output layout. You only upload a template when you're *consolidating* into a live master that accumulates many sellers over time.
 
 For each **qualifying** original invoice the tool writes **two rows**, matching the template's own pattern:
 
@@ -130,13 +133,12 @@ sheet dimension / auto‑filter / `_FilterDatabase` ranges are extended to the n
 ## 4. Instructions for use
 
 1. Open **`index.html`** in a browser (double‑click, or host it anywhere static).
-2. **Drag & drop** (or click) the **Source** file (`.csv`/`.xlsx`) and the **Target** template (`.xlsx`).
-   Each upload shows a live status (✓ loaded / ✕ error).
-3. Review the **Mapping settings** — issue date, Use Case, Updated By, Amazon VAT, marketplace, reason.
-   Defaults come from the template and SOP.
-4. Choose a **write mode**:
-   * **Append** *(default)* — keep all existing template rows, add this seller after the last one (for consolidation).
+2. **Drag & drop** (or click) the **Source** seller file (`.csv`/`.xlsx`). A live status shows ✓ loaded / ✕ error.
+3. **Target template** — leave it on **“⚡ Built‑in SDI template”** (default) to produce a fresh sheet for this seller.
+   Only switch to **“📊 Upload my own”** if you're consolidating into an existing master register; then upload it and pick a **write mode**:
+   * **Append** *(default for uploads)* — keep all existing rows, add this seller after the last one.
    * **Replace** — clear existing data rows (keep the header) and write this seller from row 2.
+4. Review the **Mapping settings** — issue date, Use Case, Updated By, Amazon VAT, marketplace, reason (sensible defaults pre‑filled).
 5. Click **⚙️ Process & map**. Watch the progress bar, then review the **Mapping summary**:
    fields detected, columns mapped, columns left blank, and validation errors/warnings, plus a preview of the generated rows.
 6. Click **⬇️ Download populated template** to save the Excel file
@@ -172,6 +174,11 @@ sheet dimension / auto‑filter / `_FilterDatabase` ranges are extended to the n
 ## 7. Technical notes
 
 * **Single file**, no backend, all processing client‑side.
+* **Built‑in template:** a clean SDI template is embedded as base64 inside the HTML. It is a **scrubbed** copy of the master — header row + per‑column styles + column widths + the FX‑rate external link only; **all sample/third‑party rows and strings were removed** (verified: no seller names, VAT numbers or amounts are embedded). On processing it is decoded in‑browser and used as the starting sheet.
 * **Libraries:** [fflate](https://github.com/101arrowz/fflate) (ZIP read/write) is **inlined**; the CSV parser, minimal XLSX reader, mapping engine and the format‑preserving XLSX writer are hand‑written and commented (sections A–F in the `<script>`).
-* **Browser support:** any current Chrome / Edge / Firefox / Safari (uses `FileReader`, `Blob`, `TextEncoder`).
+* **Browser support:** any current Chrome / Edge / Firefox / Safari (uses `FileReader`, `Blob`, `TextEncoder`, `atob`).
 * **Error handling:** invalid file types, non‑ZIP `.xlsx`, missing worksheets, unparseable dates and missing mandatory fields are all caught and reported in the UI.
+
+### Updating the built‑in template
+
+If the master SDI layout changes, regenerate the embedded template: take the new master `.xlsx`, strip its data rows (keep row 1 + one styled prototype row), base64‑encode it, and replace the `EMBEDDED_TPL_B64` constant in `index.html`. The column matcher keys off **header text**, so added/re‑ordered columns keep working as long as the header labels are recognisable.
