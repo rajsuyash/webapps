@@ -353,15 +353,29 @@ const COUNTRY = {IT:"Italy",DE:"Germany",FR:"France",ES:"Spain",NL:"Netherlands"
 /** normalise a label for fuzzy matching: lowercase, strip non-alphanumerics to single spaces */
 function norm(s){ return String(s==null?"":s).toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
 
-/** parse a number that may carry thousands separators / currency / parentheses */
+/** parse a number that may carry thousands separators / currency / parentheses, in US or EU notation */
 function parseNum(v){
   if(v==null || v==="") return null;
   if(typeof v==="number") return isFinite(v)?v:null;
   let s=String(v).trim(); if(!s) return null;
   let neg=false;
-  if(/^\(.*\)$/.test(s)){ neg=true; s=s.slice(1,-1); }
-  s=s.replace(/[^0-9.\-]/g,"");          // drop currency symbols, commas (thousands), spaces
-  if(s===""||s==="-"||s===".") return null;
+  if(/^\(.*\)$/.test(s)){ neg=true; s=s.slice(1,-1); }            // (1,234.50) → negative
+  s=s.replace(/[^\d.,\-]/g,"");                                    // drop currency symbols, spaces, letters
+  if(s.startsWith("-")){ neg=!neg; s=s.slice(1); }
+  s=s.replace(/-/g,"");
+  const hasDot=s.includes("."), hasComma=s.includes(",");
+  if(hasDot && hasComma){
+    // the LAST-appearing separator is the decimal point; the other is the thousands separator
+    if(s.lastIndexOf(",")>s.lastIndexOf(".")) s=s.replace(/\./g,"").replace(",",".");  // EU 1.234,56
+    else s=s.replace(/,/g,"");                                                          // US 1,234.56
+  } else if(hasComma){
+    const dec=s.split(",").pop();
+    if(s.split(",").length===2 && dec.length!==3) s=s.replace(",",".");  // single comma, not a 3-group → decimal
+    else s=s.replace(/,/g,"");                                           // 1,130,000 → thousands
+  } else if((s.match(/\./g)||[]).length>1){
+    s=s.replace(/\./g,"");                                               // 1.130.000 → EU thousands
+  }
+  if(s===""||s===".") return null;
   let n=parseFloat(s); if(!isFinite(n)) return null;
   return neg?-n:n;
 }
@@ -507,6 +521,77 @@ function readXlsxMatrix(buf){
 /* ===== C. SOURCE PARSER ================================================= */
 
 /** Identify a metadata label → canonical key */
+/* ---- fuzzy matching (tolerates minor spelling errors in headers/labels) ---- */
+/** Damerau-Levenshtein (optimal string alignment) — edit distance that counts an adjacent swap as 1. */
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  const d=[]; for(let i=0;i<=m;i++){ d[i]=new Array(n+1); d[i][0]=i; }
+  for(let j=0;j<=n;j++) d[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    const cost=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cost);
+    if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1]) d[i][j]=Math.min(d[i][j], d[i-2][j-2]+1);  // transposition
+  }
+  return d[m][n];
+}
+/** does any token in `toks` (fuzzily) equal `word`? tolerant of 1 typo and singular/plural. */
+function fuzzyTok(toks, word){
+  for(const t of toks){
+    if(t===word) return true;
+    if(word.length>=4){
+      if(lev(t,word)<=1) return true;
+      if(t.length>=4 && Math.abs(t.length-word.length)<=2 && (t.startsWith(word)||word.startsWith(t))) return true;
+    }
+  }
+  return false;
+}
+/** distinctive keyword sets — used only as a FALLBACK when the precise matchers miss (e.g. typos). */
+const FUZZY_ITEM=[
+  {key:"sno",kw:["sno"]},{key:"paragon",kw:["paragon"]},
+  {key:"invNumber",kw:["original","invoice","number"]},
+  {key:"gross",kw:["gross"]},
+  {key:"origNet",kw:["original","net"]},
+  {key:"origVat",kw:["vat","component"]},
+  {key:"invDate",kw:["original","invoice","date"]},
+  {key:"invoiceLink",kw:["sharepoint"]},
+  {key:"qualify",kw:["qualify"]},
+  {key:"disqualReason",kw:["disqualification"]},
+  {key:"vatRefundReason",kw:["vat","refund","reason"]},
+  {key:"revisedNet",kw:["revised","net"]},
+  {key:"cnGross",kw:["credit","note","gross"]},
+  {key:"netVatRefund",kw:["net","vat","refund"]},
+  {key:"invoiceReasonCode",kw:["invoice","reason","code"]},
+  {key:"cnRefNumber",kw:["credit","note","reference"]},
+  {key:"revisedInvNumber",kw:["corresponding","revised"]},
+  {key:"splatLink",kw:["splat"]},
+  {key:"sdiSubmitDate",kw:["submitted","sdi"]},
+  {key:"sdiTimestamp",kw:["submission","time"]}
+];
+const FUZZY_META=[
+  {key:"mcid",kw:["mcid"]},{key:"legalName",kw:["legal","name"]},
+  {key:"multiAccount",kw:["multiple","account"]},{key:"address",kw:["seller","address"]},
+  {key:"vatNumber",kw:["vat","registration"]},{key:"certProtocol",kw:["protocol"]},
+  {key:"threshold",kw:["exemption","threshold"]},{key:"certStart",kw:["certificate","start"]},
+  {key:"usedAmount",kw:["used","exemption"]},{key:"remaining",kw:["remaining","threshold"]}
+];
+/** best fuzzy field for a header: rank by coverage then by absolute hits; reject true ties / weak matches. */
+function bestFuzzy(headerNorm, table, taken){
+  const toks=headerNorm.split(" ").filter(Boolean); if(!toks.length) return null;
+  let ranked=[];
+  for(const f of table){
+    if(taken && taken[f.key]) continue;
+    let hit=0; for(const w of f.kw) if(fuzzyTok(toks,w)) hit++;
+    ranked.push({key:f.key, cov:hit/f.kw.length, hit});
+  }
+  ranked.sort((a,b)=> b.cov-a.cov || b.hit-a.hit);
+  const top=ranked[0]; if(!top || top.cov<0.66) return null;
+  const second=ranked[1];
+  if(second && second.cov===top.cov && second.hit===top.hit) return null;   // ambiguous → don't guess
+  return {key:top.key, score:top.cov};
+}
+function fuzzyItemKey(header, taken){ const r=bestFuzzy(norm(header),FUZZY_ITEM,taken); return r?r.key:null; }
+function fuzzyMetaKey(label,  taken){ const r=bestFuzzy(norm(label), FUZZY_META, taken); return r?r.key:null; }
+
 function metaKey(label){
   const n=norm(label);
   if(!n) return null;
@@ -568,33 +653,50 @@ function parseAddress(addr){
   return out;
 }
 
-/** Parse a normalised source matrix into {meta, items, detected}. */
+/* friendly labels for "approximate match" notes */
+const ITEM_LABEL={sno:"Sno",paragon:"Paragon ticket",invNumber:"Original Invoice Number",gross:"Original Invoice Gross",origNet:"Original Invoice Net",origVat:"Original Invoice VAT",invDate:"Original Invoice Date",invoiceLink:"Invoice link",qualify:"Qualify for Credit Note",disqualReason:"Disqualification reason",vatRefundReason:"VAT Refund Reason code",revisedNet:"Revised Invoice Net",cnGross:"Credit Note Gross",netVatRefund:"Net VAT Refund",invoiceReasonCode:"Invoice Reason code",cnRefNumber:"Credit Note Reference",revisedInvNumber:"Corresponding Revised Invoice No.",splatLink:"SPLAT link",sdiSubmitDate:"Date submitted to SDI",sdiTimestamp:"SDI timestamp"};
+const META_LABEL={mcid:"Seller MCID",legalName:"Seller Legal Name",multiAccount:"Multiple account",address:"Seller Address",vatNumber:"VAT registration number",certProtocol:"VAT Certificate Protocol Number",threshold:"Exemption Threshold",certStart:"Certificate Start Date",usedAmount:"Used Exemption Amount",remaining:"Remaining Threshold"};
+
+/** Parse a normalised source matrix into {meta, items, detected, notes}. */
 function parseSource(matrix){
-  const meta={}; const detected=[];
-  // -- metadata: scan early rows, label in some col, value in the next non-empty col
-  let headerRowIdx=-1, headerMap=null;
-  for(let r=0;r<matrix.length;r++){
-    const row=matrix[r]||[];
-    // detect the line-item header row
-    const keys=row.map(itemKey);
-    if(headerRowIdx<0 && keys.includes("invNumber") && (keys.includes("sno")||keys.includes("paragon")||keys.includes("gross"))){
-      headerRowIdx=r; headerMap={};
-      keys.forEach((k,ci)=>{ if(k && headerMap[k]===undefined) headerMap[k]=ci; });
-      continue;
+  const meta={}, detected=[], notes=[];
+  const note=(level,text)=>notes.push({level,text});
+
+  // -- 1. locate the line-item header row = the first row recognising several item columns (incl. an invoice number).
+  //       Only the top of the sheet is scanned (the header sits above the data), so fuzzy matching never touches data rows. --
+  let headerRowIdx=-1, headerMap=null, headerNotes=[];
+  const SCAN_LIMIT=Math.min(matrix.length, 200);
+  for(let r=0;r<SCAN_LIMIT;r++){
+    const row=matrix[r]||[]; const taken={}, map={}, approx=[];
+    for(let c=0;c<row.length;c++){
+      const cell=row[c]; if(cell==null||String(cell).trim()==="") continue;
+      let k=itemKey(cell);
+      if(!k){ k=fuzzyItemKey(cell,taken); if(k) approx.push([cell,k]); }
+      if(k && map[k]===undefined){ map[k]=c; taken[k]=1; }
     }
-    if(headerRowIdx<0){
-      for(let c=0;c<row.length;c++){
-        const k=metaKey(row[c]);
-        if(k && meta[k]===undefined){
-          for(let c2=c+1;c2<row.length;c2++){ if(row[c2]!=null && String(row[c2]).trim()!==""){ meta[k]=row[c2]; break; } }
-          if(meta[k]===undefined) meta[k]="";
-        }
+    if(map.invNumber!==undefined && Object.keys(map).length>=5){
+      headerRowIdx=r; headerMap=map; headerNotes=approx; break;     // first strong header row → stop
+    }
+  }
+  if(headerRowIdx<0) throw new Error("Could not locate the invoice line-item table (need a header row with an 'Original Invoice Number' column and several recognised columns).");
+  headerNotes.forEach(([h,k])=>note("warn",`Column header "${txt(h)}" matched approximately to "${ITEM_LABEL[k]||k}" (possible spelling difference) — please verify.`));
+
+  // -- 2. seller metadata from the rows above the header (precise, then fuzzy fallback) --
+  const mtaken={};
+  for(let r=0;r<headerRowIdx;r++){
+    const row=matrix[r]||[];
+    for(let c=0;c<row.length;c++){
+      let k=metaKey(row[c]); let approx=false;
+      if(!k){ k=fuzzyMetaKey(row[c],mtaken); approx=!!k; }
+      if(k && meta[k]===undefined){
+        for(let c2=c+1;c2<row.length;c2++){ if(row[c2]!=null && String(row[c2]).trim()!==""){ meta[k]=row[c2]; break; } }
+        if(meta[k]===undefined) meta[k]="";
+        mtaken[k]=1;
+        if(approx && meta[k]!=="") note("warn",`Seller field label "${txt(row[c])}" matched approximately to "${META_LABEL[k]||k}" — please verify.`);
       }
     }
   }
   Object.keys(meta).forEach(k=>{ if(meta[k]!=="" && meta[k]!=null) detected.push(k); });
-
-  if(headerRowIdx<0) throw new Error("Could not locate the invoice line-item table (expected a header row containing 'Original Invoice Number').");
 
   // -- line items
   const items=[];
@@ -628,7 +730,7 @@ function parseSource(matrix){
     });
   }
   meta._addr=parseAddress(meta.address);
-  return {meta, items, detected, headerKeys:Object.keys(headerMap)};
+  return {meta, items, detected, headerKeys:Object.keys(headerMap), notes};
 }
 function txt(v){ return v==null?"":String(v).trim(); }
 
@@ -687,6 +789,12 @@ function buildMapping(parsed, settings){
   const {meta, items}=parsed;
   const issues=[];                                   // {level, text}
   const add=(level,text)=>issues.push({level,text});
+  const MAX_PERROW=200;                              // cap noisy per-row issues so huge files stay responsive
+  let warnCount=0;
+  const warnRow=(text)=>{ if(warnCount<MAX_PERROW) add("warn",text); warnCount++; };
+
+  // approximate header/label matches detected during parsing
+  (parsed.notes||[]).forEach(n=>add(n.level,n.text));
 
   // mandatory seller-level checks
   if(!meta.mcid) add("error","Seller MCID is missing — 'Case Id' (col A) cannot be populated.");
@@ -695,19 +803,19 @@ function buildMapping(parsed, settings){
   if(meta.address && !meta._addr.postcode) add("warn","Could not detect a postcode in the seller address — 'Customer's postcode' (col W) left blank.");
 
   const rows=[];          // each: {kind, item, cells:{fieldKey:value}}
-  let skipped=0, qualifying=0;
+  let skipped=0, qualifying=0, blankQualify=0, pendingNum=0;
   for(const it of items){
     // qualification gate
-    if(/^no\b/i.test(it.qualify||"")){ skipped++; add("warn",`Sno ${it.sno??it._row}: skipped — 'Qualify for Credit Note' = "${it.qualify}".`); continue; }
-    if(!it.qualify) add("info",`Sno ${it.sno??it._row}: 'Qualify for Credit Note' is blank — processed anyway.`);
+    if(/^no\b/i.test(it.qualify||"")){ skipped++; warnRow(`Sno ${it.sno??it._row}: skipped — 'Qualify for Credit Note' = "${it.qualify}".`); continue; }
+    if(!it.qualify) blankQualify++;
     // per-item mandatory
-    if(!it.invNumber){ add("error",`Sno ${it.sno??it._row}: original invoice number missing — row skipped.`); skipped++; continue; }
-    if(!it.invDate)   add("warn",`Sno ${it.sno??it._row} (${it.invNumber}): original invoice date unparseable ("${it.invDateRaw}") — date columns left blank.`);
-    if(it.origNet==null||it.origVat==null) add("warn",`Sno ${it.sno??it._row} (${it.invNumber}): net/VAT value missing — amounts may be incomplete.`);
+    if(!it.invNumber){ if(warnCount<MAX_PERROW) add("error",`Sno ${it.sno??it._row}: original invoice number missing — row skipped.`); warnCount++; skipped++; continue; }
+    if(!it.invDate)   warnRow(`Sno ${it.sno??it._row} (${it.invNumber}): original invoice date unparseable ("${it.invDateRaw}") — date columns left blank.`);
+    if(it.origNet==null||it.origVat==null) warnRow(`Sno ${it.sno??it._row} (${it.invNumber}): net/VAT value missing — amounts may be incomplete.`);
     // reconciliation check
     if(it.gross!=null && it.origNet!=null && it.origVat!=null && Math.abs(it.gross-(it.origNet+it.origVat))>0.02)
-      add("warn",`Sno ${it.sno??it._row} (${it.invNumber}): gross ≠ net + VAT (${it.gross} vs ${(it.origNet+it.origVat).toFixed(2)}).`);
-    if(!it.cnRefNumber && !it.revisedInvNumber) add("info",`Sno ${it.sno??it._row} (${it.invNumber}): credit-note / revised-invoice numbers not yet filled (SPS step) — 'Rebill Invoice/credit number' (col I) left blank.`);
+      warnRow(`Sno ${it.sno??it._row} (${it.invNumber}): gross ≠ net + VAT (${it.gross} vs ${(it.origNet+it.origVat).toFixed(2)}).`);
+    if(!it.cnRefNumber && !it.revisedInvNumber) pendingNum++;
 
     qualifying++;
     for(const kind of ["credit","rebill"]){
@@ -720,6 +828,10 @@ function buildMapping(parsed, settings){
       rows.push({kind, item:it, cells});
     }
   }
+  // aggregated (non-noisy) notes
+  if(warnCount>MAX_PERROW) add("warn",`…and ${warnCount-MAX_PERROW} more per-row warning(s) not listed.`);
+  if(blankQualify) add("info",`${blankQualify} row(s) had a blank 'Qualify for Credit Note' — processed anyway.`);
+  if(pendingNum)   add("info",`${pendingNum} row(s): credit-note / revised-invoice numbers not yet filled (SPS step) — 'Rebill Invoice/credit number' (col I) left blank.`);
   return {rows, issues, stats:{items:items.length, qualifying, skipped, generated:rows.length}};
 }
 
@@ -786,9 +898,7 @@ function buildTargetFile(templateBuf, mappedRows, mode){
   mappedRows.forEach((mr,idx)=>{
     const rNum=startRow+idx;
     let cellsXml="";
-    // iterate columns in order for tidy XML
-    const cols=Object.keys(fieldToCol).map(k=>fieldToCol[k]).sort((a,b)=>a-b);
-    // build per-column list
+    // build per-column list (in column order for tidy XML)
     const colCells=[];
     for(const f of TARGET_FIELDS){
       const ci=fieldToCol[f.key]; if(ci===undefined) continue;
@@ -1059,12 +1169,18 @@ function renderResults(mapping, settings){
   const vb=$("valBody"); vb.innerHTML="";
   const order={error:0,warn:1,info:2};
   const sorted=[...mapping.issues].sort((a,b)=>order[a.level]-order[b.level]);
+  const CAP=80;                                       // keep the DOM light for large inputs
   if(!sorted.length){ vb.innerHTML=`<div class="msg ok"><span class="mi">✓</span><span>All mandatory fields mapped with no warnings.</span></div>`; }
-  else sorted.forEach(i=>{
-    const cls=i.level==="error"?"err":i.level==="warn"?"warn":"info";
-    const ic=i.level==="error"?"✕":i.level==="warn"?"!":"i";
-    vb.insertAdjacentHTML("beforeend",`<div class="msg ${cls}"><span class="mi">${ic}</span><span>${escHtml(i.text)}</span></div>`);
-  });
+  else{
+    let html="";
+    sorted.slice(0,CAP).forEach(i=>{
+      const cls=i.level==="error"?"err":i.level==="warn"?"warn":"info";
+      const ic=i.level==="error"?"✕":i.level==="warn"?"!":"i";
+      html+=`<div class="msg ${cls}"><span class="mi">${ic}</span><span>${escHtml(i.text)}</span></div>`;
+    });
+    if(sorted.length>CAP) html+=`<div class="msg info"><span class="mi">i</span><span>…and ${sorted.length-CAP} more message(s) not shown.</span></div>`;
+    vb.innerHTML=html;
+  }
   $("valCnt").textContent=`${errs} error(s) · ${warns} warning(s)`;
 
   // seller details

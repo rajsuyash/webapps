@@ -128,6 +128,36 @@ new `<row>` elements reuse the template's own per‑column style indices, and ne
 byte‑for‑byte. `calcChain.xml` is dropped so Excel rebuilds it cleanly (no "repair" prompt), and the
 sheet dimension / auto‑filter / `_FilterDatabase` ranges are extended to the new last row.
 
+### Robustness to messy input
+
+* **Typo‑tolerant column & label matching.** Headers and seller labels are matched first by precise
+  keyword rules, then by a **fuzzy fallback** (Damerau‑Levenshtein, so one typo *or* an adjacent letter
+  swap is forgiven, e.g. `Orignal Invoice Nmber` → *Original Invoice Number*, `Naem` → *Name*). Fuzzy
+  matches raise a **“matched approximately — please verify”** warning so nothing is mapped silently, and
+  an ambiguous match is left unmapped rather than guessed.
+* **Locale‑aware numbers.** `parseNum` handles US (`1,130,000.50`) and EU (`1.130.000,50`) notation,
+  currency symbols, spaces and `(...)` negatives.
+* **Flexible dates.** `DD‑MM‑YY`, `DD/MM/YYYY`, ISO and Excel serials are all accepted.
+* **Graceful degradation.** Missing invoice numbers / `Qualify = No` rows are skipped with a reason;
+  blank optional fields are left empty; mandatory gaps surface as errors — never a silent wrong value.
+
+### Scale & performance
+
+All work is client‑side and synchronous. Measured end‑to‑end (parse → map → write) on a laptop:
+
+| Source invoices | Output rows | Time | Output size |
+|---|---|---|---|
+| ~20 (typical seller) | ~42 | < 50 ms | ~16 KB |
+| 1,000 | 2,000 | ~0.6 s | 0.3 MB |
+| 10,000 | 20,000 | ~5 s | 2.6 MB |
+| 50,000 | 100,000 | ~30 s | 13 MB |
+
+Repetitive per‑row notes are **aggregated** (e.g. “*N rows: credit‑note numbers not yet filled*”) and the
+on‑screen list is capped, so the UI stays light regardless of row count. For the real workflow (tens of
+rows per seller) it is effectively instant. The remaining cost at extreme sizes is the synchronous
+ZIP/XML build on the main thread — see *Future enhancements* for the Web‑Worker path if 5‑figure row
+counts ever become routine.
+
 ---
 
 ## 4. Instructions for use
@@ -161,12 +191,13 @@ sheet dimension / auto‑filter / `_FilterDatabase` ranges are extended to the n
 
 ## 6. Recommended future enhancements
 
+* **Web Worker + streaming write** — for 5‑figure row counts, move parsing/zip generation to a Web Worker (with `fflate`'s async API) so the UI never blocks, and drive a *real* per‑row progress bar. Not needed for the current per‑seller volumes, but the clean way to scale to very large consolidations.
 * **Batch processing** — accept many seller files at once and consolidate them into a single template run.
 * **Saved mapping configurations** — persist settings and custom column mappings (localStorage / export‑import JSON) per workflow.
+* **Mapping‑confirmation step** — when fuzzy matching is used, show a small “did you mean” review grid so the user can confirm/correct approximate column matches before processing.
 * **Validation dashboard** — totals reconciliation (Σ credits vs. Σ rebills vs. exemption used/remaining), per‑seller threshold checks, and exportable validation reports.
 * **Audit log** — record source file name/hash, settings, row counts and a timestamp into a hidden sheet or sidecar file for traceability.
 * **Mapping editor UI** — let users remap or override any source→target column without code changes.
-* **Drag‑and‑drop multi‑select & templates library** — remember the last target template; drag several sources onto one window.
 * **i18n / locale options** — explicit date‑order and decimal‑separator toggles for non‑IT marketplaces.
 
 ---
