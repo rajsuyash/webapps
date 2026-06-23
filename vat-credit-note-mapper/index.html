@@ -659,8 +659,8 @@ const TARGET_FIELDS=[
   {key:"sdiId",    hdr:n=>n.includes("sdi identi"),             type:"string", v:(c,k)=>null},
   {key:"sdiDate",  hdr:n=>n.includes("date accepted in sdi"),   type:"date",   v:(c,k)=> c.item.sdiSubmitDate||null},
   {key:"sdiReason",hdr:n=>n.includes("sdi reason code"),        type:"string", v:(c,k)=> k==="credit"?"TD04":"TD01"},
-  {key:"feDate",   hdr:n=>n==="fe date",                        type:"date",   v:(c,k)=>null},
-  {key:"feNumber", hdr:n=>n==="fe number",                      type:"string", v:(c,k)=>null}
+  {key:"feDate",   hdr:n=>n==="fe date",                        type:"date",   v:(c,k)=>parseDate(c.meta.certStart)},
+  {key:"feNumber", hdr:n=>n==="fe number",                      type:"string", v:(c,k)=>c.meta.certProtocol||null}
 ];
 function neg(n){ return (n==null)?null:-Math.abs(n); }
 function grossOf(it){ return it.gross!=null?it.gross : ((it.origNet||0)+(it.origVat||0)); }

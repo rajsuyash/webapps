@@ -62,6 +62,8 @@ are re‑ordered. All 40 columns are resolved; styles are inherited per‑column
 | Seller Legal Name | **U** Customer name | The seller is Amazon's *customer* for these fees |
 | VAT registration number | **L** Customer VAT number | Seller's VAT number |
 | Seller Address | **V / W / X / Y** | Parsed → street / postcode / town / country (`IT → Italy`) |
+| Seller Exemption Certificate Start Date | **AM** FE Date | Exemption certificate start date (written as a date) |
+| VAT Certificate Protocol Number | **AN** FE Number | Exemption certificate protocol number |
 
 **Per invoice → Credit row (TD04) and Rebill row (TD01)**
 
@@ -94,7 +96,7 @@ are re‑ordered. All 40 columns are resolved; styles are inherited per‑column
 
 **Left blank** (not present in the source — filled later by the downstream / SPS team):
 **H** Accounting period, **I** Rebill/credit number *(pending SPS)*, **M** Italian fiscal code,
-**P** SP business status, **T** Fee type name, **AJ** SDI Identifier, **AM** FE Date, **AN** FE Number.
+**P** SP business status, **T** Fee type name, **AJ** SDI Identifier.
 
 ---
 
@@ -144,7 +146,8 @@ sheet dimension / auto‑filter / `_FilterDatabase` ranges are extended to the n
 * **Issue date defaults to today**; it drives the *Month*, *Invoice Date* and the rebill period (start/end of the issue month). The credit row's period follows the original invoice's month.
 * **Dates are day‑first** (`DD‑MM‑YY`), matching the Italian source; **comma = thousands**, **dot = decimal**.
 * **Amazon VAT `IT08973230967`** and **marketplace `IT`** are pre‑filled from the template — override in settings if needed.
-* The **Rebill/credit number (col I)** and **FE Date/Number** are produced downstream (SPS / issuing team); they are left blank with an info note when absent in the source.
+* The **Rebill/credit number (col I)** is produced downstream (SPS / issuing team); it is left blank with an info note when absent in the source.
+* **FE Date (col AM)** and **FE Number (col AN)** carry the seller's exemption certificate **Start Date** and **Protocol Number** (repeated on every row, since the certificate applies to the whole seller).
 * `Use Case` defaults to **VAT rate adjustment** (the 22 % → 0 % mechanic); switch to *VAT Refund* etc. per your SOP.
 
 ---
