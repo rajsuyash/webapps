@@ -62,8 +62,13 @@ are re‑ordered. All 40 columns are resolved; styles are inherited per‑column
 | Seller Legal Name | **U** Customer name | The seller is Amazon's *customer* for these fees |
 | VAT registration number | **L** Customer VAT number | Seller's VAT number |
 | Seller Address | **V / W / X / Y** | Parsed → street / postcode / town / country (`IT → Italy`) |
-| Seller Exemption Certificate Start Date | **AM** FE Date | Exemption certificate start date (written as a date) |
-| VAT Certificate Protocol Number | **AN** FE Number | Exemption certificate protocol number |
+| Seller Exemption Certificate Start Date | **AM** *Identificativo dichiarazione date* | Exemption certificate start date (written as a date) |
+| VAT Certificate Protocol Number | **AN** *Identificativo dichiarazione* | Exemption certificate protocol number |
+
+> **Output header relabelling:** in the generated file the last two header cells are renamed
+> from `FE Date` / `FE Number` to **`Identificativo dichiarazione date`** / **`Identificativo dichiarazione`**.
+> The column matcher accepts *both* the old and the new labels, so the tool keeps working if a
+> previously‑generated (already‑renamed) file is re‑used as the target template for consolidation.
 
 **Per invoice → Credit row (TD04) and Rebill row (TD01)**
 
@@ -147,7 +152,7 @@ sheet dimension / auto‑filter / `_FilterDatabase` ranges are extended to the n
 * **Dates are day‑first** (`DD‑MM‑YY`), matching the Italian source; **comma = thousands**, **dot = decimal**.
 * **Amazon VAT `IT08973230967`** and **marketplace `IT`** are pre‑filled from the template — override in settings if needed.
 * The **Rebill/credit number (col I)** is produced downstream (SPS / issuing team); it is left blank with an info note when absent in the source.
-* **FE Date (col AM)** and **FE Number (col AN)** carry the seller's exemption certificate **Start Date** and **Protocol Number** (repeated on every row, since the certificate applies to the whole seller).
+* The last two columns (**AM / AN**) carry the seller's exemption certificate **Start Date** and **Protocol Number** (repeated on every row, since the certificate applies to the whole seller), and their output headers are relabelled to **`Identificativo dichiarazione date`** and **`Identificativo dichiarazione`**.
 * `Use Case` defaults to **VAT rate adjustment** (the 22 % → 0 % mechanic); switch to *VAT Refund* etc. per your SOP.
 
 ---

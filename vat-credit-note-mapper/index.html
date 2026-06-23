@@ -659,8 +659,8 @@ const TARGET_FIELDS=[
   {key:"sdiId",    hdr:n=>n.includes("sdi identi"),             type:"string", v:(c,k)=>null},
   {key:"sdiDate",  hdr:n=>n.includes("date accepted in sdi"),   type:"date",   v:(c,k)=> c.item.sdiSubmitDate||null},
   {key:"sdiReason",hdr:n=>n.includes("sdi reason code"),        type:"string", v:(c,k)=> k==="credit"?"TD04":"TD01"},
-  {key:"feDate",   hdr:n=>n==="fe date",                        type:"date",   v:(c,k)=>parseDate(c.meta.certStart)},
-  {key:"feNumber", hdr:n=>n==="fe number",                      type:"string", v:(c,k)=>c.meta.certProtocol||null}
+  {key:"feDate",   hdr:n=>n==="fe date"||n==="identificativo dichiarazione date", type:"date",   v:(c,k)=>parseDate(c.meta.certStart)},
+  {key:"feNumber", hdr:n=>n==="fe number"||n==="identificativo dichiarazione",      type:"string", v:(c,k)=>c.meta.certProtocol||null}
 ];
 function neg(n){ return (n==null)?null:-Math.abs(n); }
 function grossOf(it){ return it.gross!=null?it.gross : ((it.origNet||0)+(it.origVat||0)); }
@@ -812,6 +812,12 @@ function buildTargetFile(templateBuf, mappedRows, mode){
   const ncol=colLetter(Math.max(40,headerCells.length));
   newSheet=newSheet.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:${ncol}${newLast}"/>`);
   newSheet=newSheet.replace(/(<autoFilter ref=")[^"]*(")/, `$1A1:${ncol}${newLast}$2`);
+
+  // --- relabel specific output headers (row 1) to the required SDI column names ---
+  for(const fk in HEADER_RENAMES){
+    const ci=fieldToCol[fk]; if(ci===undefined) continue;            // only if that column exists
+    newSheet=renameHeaderCell(newSheet, colLetter(ci)+"1", HEADER_RENAMES[fk]);
+  }
   files[sheetPath]=te.encode(newSheet);
 
   // --- update _FilterDatabase defined name in workbook.xml (optional, keeps filter sane) ---
@@ -846,6 +852,21 @@ function encodeCell(ref,sAttr,type,val){
   }
   const s=String(val); const sp=/^\s|\s$/.test(s)?' xml:space="preserve"':"";
   return `<c r="${ref}"${sAttr} t="inlineStr"><is><t${sp}>${escXml(s)}</t></is></c>`;
+}
+
+/* Output header relabels: field key -> the column name required in the final file. */
+const HEADER_RENAMES={
+  feDate:  "Identificativo dichiarazione date",
+  feNumber:"Identificativo dichiarazione"
+};
+/** Replace a single header cell's text (row 1) with an inline string, preserving its style. */
+function renameHeaderCell(xml, ref, text){
+  const re=new RegExp('<c r="'+ref+'"([^>]*?)(?:\\/>|>[\\s\\S]*?<\\/c>)');
+  return xml.replace(re, (_m, attrs)=>{
+    const sM=attrs.match(/\bs="(\d+)"/); const sAttr=sM?` s="${sM[1]}"`:"";
+    const sp=/^\s|\s$/.test(text)?' xml:space="preserve"':"";
+    return `<c r="${ref}"${sAttr} t="inlineStr"><is><t${sp}>${escXml(text)}</t></is></c>`;
+  });
 }
 
 function dropCalcChain(files){
