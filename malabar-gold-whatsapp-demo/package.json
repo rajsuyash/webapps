@@ -1,0 +1,16 @@
+{
+  "name": "malabar-gold-whatsapp-demo",
+  "version": "1.0.0",
+  "description": "Maya — WhatsApp AI Jewellery Concierge demo for Malabar Gold & Diamonds (interactive browser demo + zero-dependency mock backend).",
+  "scripts": {
+    "start": "node serve.js",
+    "frontend": "node serve.js",
+    "backend": "node backend/server.js",
+    "smoke": "node smoke-test.js"
+  },
+  "keywords": ["whatsapp", "ai-agent", "conversational-ai", "jewellery", "retail", "rag", "demo"],
+  "license": "MIT",
+  "devDependencies": {
+    "playwright-core": "^1.61.1"
+  }
+}

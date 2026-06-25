@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maya · Malabar Gold & Diamonds — WhatsApp AI Concierge (Demo)</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="stage">
+
+    <!-- ░░ Left: scenario launcher / control rail ░░ -->
+    <aside class="rail">
+      <div class="rail-brand">
+        <div class="logo">M</div>
+        <div>
+          <div class="rb-title">Malabar Gold &amp; Diamonds</div>
+          <div class="rb-sub">WhatsApp AI Concierge · <b>Maya</b></div>
+        </div>
+      </div>
+
+      <div class="rail-note">Click a scenario to run it live. You can also type freely in the chat at any time.</div>
+
+      <div class="scnlist" id="scnlist"></div>
+
+      <div class="rail-foot">
+        <div class="kpi"><b>~90%</b><span>WhatsApp open rate</span></div>
+        <div class="kpi"><b>&lt;₹3</b><span>cost / AI chat</span></div>
+        <div class="kpi"><b>&lt;60s</b><span>lead → sales</span></div>
+      </div>
+      <div class="disclaimer">Demo prototype · illustrative data &amp; prices · not a live Malabar service.</div>
+    </aside>
+
+    <!-- ░░ Right: the phone ░░ -->
+    <main class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+
+        <!-- WhatsApp chat header -->
+        <header class="wa-head">
+          <span class="wa-back">‹</span>
+          <div class="wa-av">M</div>
+          <div class="wa-id">
+            <div class="wa-name">Malabar Gold &amp; Diamonds <span class="verified" title="Verified business">✔</span></div>
+            <div class="wa-status" id="hstatus">online</div>
+          </div>
+          <div class="wa-actions">
+            <select id="langsel" title="Language">
+              <option value="en">EN</option>
+              <option value="hi">हिं</option>
+              <option value="ta">தமிழ்</option>
+              <option value="te">తెలుగు</option>
+              <option value="ml">മലയാളം</option>
+              <option value="kn">ಕನ್ನಡ</option>
+            </select>
+            <button id="reset" class="wa-reset" title="Restart demo">⟳</button>
+          </div>
+        </header>
+
+        <!-- messages -->
+        <div class="wa-thread" id="thread"></div>
+
+        <!-- quick-reply chips -->
+        <div class="wa-chips empty" id="chips"></div>
+
+        <!-- composer -->
+        <footer class="wa-input">
+          <span class="ic">😊</span>
+          <input id="msg" type="text" placeholder="Type a message…" autocomplete="off" />
+          <span class="ic">📎</span>
+          <button id="send" class="send" title="Send">➤</button>
+          <span class="ic mic" title="Voice note (demo)">🎙️</span>
+        </footer>
+      </div>
+      <div class="phone-cap">Maya runs entirely inside WhatsApp — no app to download, for any of Malabar’s millions of customers.</div>
+    </main>
+  </div>
+
+  <!-- data + engines + controller -->
+  <script src="js/data/products.js"></script>
+  <script src="js/data/stores.js"></script>
+  <script src="js/engine/recommendation.js"></script>
+  <script src="js/engine/rag.js"></script>
+  <script src="js/data/scenarios.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
