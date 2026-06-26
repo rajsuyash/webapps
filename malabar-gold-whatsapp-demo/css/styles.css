@@ -46,12 +46,12 @@ body{
   box-shadow:0 36px 70px rgba(0,0,0,.55),0 0 0 2px #2a2a2a;display:flex}
 .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:150px;height:26px;background:#000;
   border-radius:0 0 18px 18px;z-index:5}
-.phone>*{flex:1}
-.wa-thread,.wa-head,.wa-chips,.wa-input{}
-.phone .wa-head{position:absolute}
-/* inner screen */
-.phone{flex-direction:column}
+/* inner screen — clean flex column: fixed header, scrolling thread, fixed chips + input */
+.phone{flex-direction:column;overflow:hidden}
 .wa-head,.wa-thread,.wa-chips,.wa-input{width:100%}
+.wa-head{flex:0 0 auto;z-index:2}
+.wa-thread{flex:1 1 auto;min-height:0}
+.wa-chips,.wa-input{flex:0 0 auto}
 .phone>.wa-head{border-radius:32px 32px 0 0}
 
 .wa-head{background:var(--wa-green);display:flex;align-items:center;gap:9px;padding:30px 12px 10px;color:#fff;flex:0 0 auto}
