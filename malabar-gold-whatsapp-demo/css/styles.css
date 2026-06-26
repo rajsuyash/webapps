@@ -210,8 +210,14 @@ body{
 .wa-thread::-webkit-scrollbar-thumb,.carousel::-webkit-scrollbar-thumb{background:#c3b9ac;border-radius:6px}
 
 /* responsive */
+/* Wide screens: WhatsApp phone dead-centre in the viewport, use-cases rail pinned far left */
+@media(min-width:1180px){
+  .stage{justify-content:center;gap:0}
+  .rail{position:fixed;left:clamp(20px,3vw,64px);top:50%;transform:translateY(-50%);
+    width:330px;max-height:calc(100vh - 28px)}
+}
 @media(max-width:880px){
   .stage{flex-direction:column;align-items:center}
-  .rail{width:390px;flex:none;order:2}
+  .rail{position:static;transform:none;max-height:none;width:390px;flex:none;order:2}
   .phone{order:1}
 }
