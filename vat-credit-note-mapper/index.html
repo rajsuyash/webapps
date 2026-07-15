@@ -747,7 +747,9 @@ const TARGET_FIELDS=[
   {key:"endPeriod",hdr:n=>n.includes("end of period"),          type:"date",   v:(c,k)=> k==="credit" ? (c.item.invDate&&lastOfMonth(c.item.invDate)) : lastOfMonth(c.set.issueDate)},
   {key:"acctPeriod",hdr:n=>n.includes("accounting period"),     type:"date",   v:(c,k)=>null},
   {key:"rebillNum",hdr:n=>n.includes("rebill invoice")||n.includes("rebill credit")||(n.includes("rebill")&&n.includes("number")), type:"string",
-                   v:(c,k)=> k==="credit" ? (c.item.cnRefNumber||null) : (c.item.revisedInvNumber||null)},
+                   v:(c,k)=>{ const src = k==="credit" ? c.item.cnRefNumber : c.item.revisedInvNumber;   // use SPS-provided number if present
+                              if(src) return src;
+                              return c.item.invNumber ? (c.item.invNumber + (k==="credit"?"CN":"RB")) : null; }},   // else generate from original invoice no.
   {key:"marketplace",hdr:n=>n.includes("aeu marketplace")||n==="marketplace", type:"string", v:(c,k)=>c.set.marketplace||null},
   {key:"amazonVat",hdr:n=>n.includes("amazon vat"),             type:"string", v:(c,k)=>c.set.amazonVat||null},
   {key:"custVat",  hdr:n=>n.includes("customer vat"),           type:"string", v:(c,k)=>c.meta.vatNumber||null},
@@ -831,7 +833,7 @@ function buildMapping(parsed, settings){
   // aggregated (non-noisy) notes
   if(warnCount>MAX_PERROW) add("warn",`…and ${warnCount-MAX_PERROW} more per-row warning(s) not listed.`);
   if(blankQualify) add("info",`${blankQualify} row(s) had a blank 'Qualify for Credit Note' — processed anyway.`);
-  if(pendingNum)   add("info",`${pendingNum} row(s): credit-note / revised-invoice numbers not yet filled (SPS step) — 'Rebill Invoice/credit number' (col I) left blank.`);
+  if(pendingNum)   add("info",`${pendingNum} row(s): 'Rebill Invoice/credit number' (col I) auto-generated from the original invoice number (Credit → …CN, Rebill → …RB).`);
   return {rows, issues, stats:{items:items.length, qualifying, skipped, generated:rows.length}};
 }
 
