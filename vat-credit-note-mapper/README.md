@@ -84,7 +84,7 @@ are re‑ordered. All 40 columns are resolved; styles are inherited per‑column
 | Original Invoice Gross Value | **AB**/**AH** = −Gross | — |
 | Revised Invoice Net Value | — | **Z / AB / AF / AH** = +Revised Net |
 | *(derived)* VAT rate | **AI** = original rate (e.g. 22) | **AI** = 0 |
-| Original Invoice Number *(col S)* **+ suffix** | **I** = `<S>` + `CN` | **I** = `<S>` + `RB` |
+| Original Invoice Number *(col S)* **+ suffix** | **I** = `<S>` + `/CN` | **I** = `<S>` + `/RB` |
 | Credit Note Ref. № / Corresponding Revised № | **I** — used instead *if* the source (SPS) column is filled | *(same, for the rebill)* |
 | Date When Submitted to SDI System | **AK** Date accepted in SDI | **AK** |
 | *(constant)* | **N** = `Credit`, **AL** = `TD04` | **N** = `Rebill`, **AL** = `TD01` |
@@ -183,7 +183,7 @@ counts ever become routine.
 * **Issue date defaults to today**; it drives the *Month*, *Invoice Date* and the rebill period (start/end of the issue month). The credit row's period follows the original invoice's month.
 * **Dates are day‑first** (`DD‑MM‑YY`), matching the Italian source; **comma = thousands**, **dot = decimal**.
 * **Amazon VAT `IT08973230967`** and **marketplace `IT`** are pre‑filled from the template — override in settings if needed.
-* The **Rebill/credit number (col I)** is auto‑generated from the original invoice number (col S): Credit rows get a `CN` suffix, Rebill rows get an `RB` suffix (e.g. `IT-AEU-2026-99022` → `…CN` / `…RB`). If the source (SPS) already carries an explicit Credit‑Note / Corresponding‑Revised number, that value is used instead.
+* The **Rebill/credit number (col I)** is auto‑generated from the original invoice number (col S): Credit rows get a `/CN` suffix, Rebill rows get an `/RB` suffix (e.g. `IT-AEU-2026-99022` → `…/CN` / `…/RB`). If the source (SPS) already carries an explicit Credit‑Note / Corresponding‑Revised number, that value is used instead.
 * The last two columns (**AM / AN**) carry the seller's exemption certificate **Start Date** and **Protocol Number** (repeated on every row, since the certificate applies to the whole seller), and their output headers are relabelled to **`Identificativo dichiarazione date`** and **`Identificativo dichiarazione`**.
 * `Use Case` defaults to **VAT rate adjustment** (the 22 % → 0 % mechanic); switch to *VAT Refund* etc. per your SOP.
 
